@@ -1,0 +1,30 @@
+{
+    "model_generate_config": {
+        "max_length": 100,
+        "do_sample": true,
+        "no_repeat_ngram_size": 2,
+        "num_return_sequences": 3,
+        "early_stopping": true,
+        "top_k": 50,
+        "top_p": 0.9,
+        "temperature": 0.7,
+        "n": 1,
+        "stop": ["\n", "End of response."],
+        "length_penalty": 0.5,
+        "repetition_penalty": 1.0
+    },
+    "model_generate_comment": {
+        "max_length": "Độ dài tối đa của câu trả lời.",
+        "do_sample": "Nếu bạn muốn văn bản sinh ra có tính ngẫu nhiên hơn, hãy đặt tham số này là True.",
+        "no_repeat_ngram_size": "Số lần lặp lại n-gram tối đa.",
+        "num_return_sequences": "Số lượng câu trả lời bạn muốn sinh ra.",
+        "early_stopping": "Dừng sinh ra văn bản khi gặp ký tự kết thúc.",
+        "top_k": "Điều chỉnh số lượng token được chọn trong quá trình sampling. Giá trị lớn hơn làm cho câu trả lời đa dạng hơn.",
+        "top_p": "Giữ lại các token cho đến khi xác suất tích lũy đạt 90%",
+        "temperature": "Điều chỉnh độ đa dạng của câu trả lời. Giá trị lớn hơn làm cho câu trả lời đa dạng hơn.",
+        "n": "Số lần sinh ra câu trả lời.",
+        "stop": "Các ký tự kết thúc câu trả lời.",
+        "length_penalty": "Điều chỉnh độ dài của câu trả lời. Giá trị lớn hơn làm cho câu trả lời dài hơn.",
+        "repetition_penalty": "Điều chỉnh độ trùng lặp của câu trả lời. Giá trị lớn hơn làm cho câu trả lời ít trùng lặp hơn."
+    }
+}
