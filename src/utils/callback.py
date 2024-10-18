@@ -23,7 +23,7 @@ class CustomEarlyStoppingCallback(TrainerCallback):
     def on_epoch_end(self, args, state, control, **kwargs):
         # Lấy giá trị loss từ trainer
         logs = state.log_history[-1]  # Lấy logs của epoch cuối cùng
-        print ("log......................")
-        print (state.log_history[-1])
+        # print ("log......................")
+        # print (state.log_history[-1])
         if 'loss' in logs:
             self.logger.info(f"Epoch {state.epoch}, Loss: {logs['loss']}")
