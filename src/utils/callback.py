@@ -48,6 +48,6 @@ class CustomSaveModelCallback(TrainerCallback):
             if os.path.exists(directory):
                 shutil.rmtree(directory)
 
-            self.model.save_pretrained(path)
-            self.tokenizer.save_pretrained(path)
+            self.model.save_pretrained(self.path)
+            self.tokenizer.save_pretrained(self.path)
             print(f"\nModel saved at epoch {current_epoch}")
