@@ -1,7 +1,8 @@
+import os
 from transformers import TrainerCallback
 
 class CustomEarlyStoppingCallback(TrainerCallback):
-    def __init__(self, threshold, logger=None):
+    def __init__(self, threshold=None, logger=None):
         self.threshold = threshold
         self.logger = logger
 
@@ -10,10 +11,12 @@ class CustomEarlyStoppingCallback(TrainerCallback):
         if logs is None:
             return
 
+        if (self.threshold is None) or (self.threshold <= 0):
+                return
+
         # Check if 'loss' is in logs
         if 'loss' in logs:
             current_loss = logs['loss']
-            # print(f"\nCurrent loss: {current_loss}")
 
             # Stop training if loss is below or equal to the threshold
             if current_loss <= self.threshold:
@@ -21,9 +24,30 @@ class CustomEarlyStoppingCallback(TrainerCallback):
                 control.should_training_stop = True
     
     def on_epoch_end(self, args, state, control, **kwargs):
+        if self.logger is None:
+            return
+            
         # Lấy giá trị loss từ trainer
         logs = state.log_history[-1]  # Lấy logs của epoch cuối cùng
-        # print ("log......................")
-        # print (state.log_history[-1])
+
         if 'loss' in logs:
             self.logger.info(f"Epoch {state.epoch}, Loss: {logs['loss']}")
+
+class CustomSaveModelCallback(TrainerCallback):
+    def __init__(self, model, tokenizer, epoch_save=10, path='./models'):
+        self.epoch_save = epoch_save
+        self.model = model
+        self.tokenizer = tokenizer
+        self.path = path
+    
+    def on_epoch_end(self, args, state, control, **kwargs):
+        current_epoch = state.epoch
+
+        if (current_epoch % self.epoch_save == 0) and (current_epoch > 0):
+            directory = os.path.abspath(self.path)
+            if os.path.exists(directory):
+                shutil.rmtree(directory)
+
+            self.model.save_pretrained(path)
+            self.tokenizer.save_pretrained(path)
+            print(f"\nModel saved at epoch {current_epoch}")
