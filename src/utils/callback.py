@@ -1,6 +1,7 @@
 import os
 import shutil
 from transformers import TrainerCallback
+from .common import load_config
 
 class CustomEarlyStoppingCallback(TrainerCallback):
     def __init__(self, threshold=None, logger=None):
@@ -35,11 +36,12 @@ class CustomEarlyStoppingCallback(TrainerCallback):
             self.logger.info(f"Epoch {state.epoch}, Loss: {logs['loss']}")
 
 class CustomSaveModelCallback(TrainerCallback):
-    def __init__(self, model, tokenizer, epoch_save=10, path='./models'):
+    def __init__(self, model, tokenizer, epoch_save=10, path='./models', gpt_model=None):
         self.epoch_save = epoch_save
         self.model = model
         self.tokenizer = tokenizer
         self.path = path
+        self.gpt_model = gpt_model
     
     def on_epoch_end(self, args, state, control, **kwargs):
         current_epoch = state.epoch
@@ -52,3 +54,12 @@ class CustomSaveModelCallback(TrainerCallback):
             self.model.save_pretrained(self.path)
             self.tokenizer.save_pretrained(self.path)
             print(f"\n\n\nModel saved at epoch {current_epoch}")
+
+            if (self.gpt_model is not None):
+                config = load_config(os.path.abspath("./src/config/config.json"))
+                model_generate_config = config["model_generate_config"]
+
+                question = "wghn"
+                predict = self.gpt_model.generate(question, model_generate_config)
+                print ("\n\n\nMe: ", question)
+                print ("\n\n\nBot: ", predict)
