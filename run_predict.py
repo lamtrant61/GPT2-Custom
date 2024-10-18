@@ -5,8 +5,9 @@ from src.utils.common import load_csv_data
 config = run_model(os.path.abspath("./src/config/config.json"))
 model_generate_config = config["model_generate_config"]
 
-Model = Model_GPT2()
-dataset = Model.loading_dataset(os.path.abspath("./data/data_test.xlsx"))
+Model = Model_GPT2(os.path.abspath("./models"))
 
-Model.train(dataset)
-Model.save()
+question = "giới thiệu wghn"
+predict = Model.generate(question, model_generate_config)
+print ("\n\n\n", predict)
+
