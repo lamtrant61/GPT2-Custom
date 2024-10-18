@@ -64,7 +64,7 @@ class Model_GPT2:
     def train(self, train_dataset, lr=5e-4, epochs=10):
         self.clear_cache()
 
-        time = datetime.now().strftime("%Y-%m-%d %H:%M")
+        time = datetime.now().strftime("%Y_%m_%d,%H_%M")
         logger.add(f"./logs/gpt2_{time}.log")
 
         custom_callback = CustomEarlyStoppingCallback(threshold=0.0001, logger=logger)
