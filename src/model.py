@@ -4,13 +4,10 @@ import torch
 from transformers import GPT2LMHeadModel, GPT2Tokenizer, Trainer, TrainingArguments
 from .utils.common import load_config, load_csv_data
 from .utils.dataset import TextDataset
-from .utils.callback import CustomEarlyStoppingCallback
+from .utils.callback import CustomEarlyStoppingCallback, CustomSaveModelCallback
 import shutil
 from loguru import logger
 from datetime import datetime
-# from tqdm import tqdm
-# from datasets import Dataset
-# import pandas as pd
 
 os.environ["WANDB_LOG_MODEL"] = "checkpoint"  # log all model checkpoints
 os.environ["WANDB_MODE"] = "dryrun"  # offline mode
@@ -27,18 +24,24 @@ class Model_GPT2:
         self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token  # Đặt pad token là eos token
         self.model = GPT2LMHeadModel.from_pretrained(model_name)
+
+        special_tokens_dict = {'sep_token': '<|sep|>'}
+        self.tokenizer.add_special_tokens(special_tokens_dict)
         self.model.resize_token_embeddings(len(self.tokenizer))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     def loading_dataset(self, filename):
         df = load_csv_data(filename)
+        # df['text'] = df['Question'] + " " + df['Answer']
         df['text'] = df['Question'] + " <|sep|> " + df['Answer']
 
         texts_raw = df['text'].tolist()
         texts = texts_raw * 5
 
         encodings = self.tokenizer(texts, truncation=True, padding=True, return_tensors='pt', max_length=512)
-        dataset = TextDataset(encodings)
+        sep_token_id = self.tokenizer.convert_tokens_to_ids('<|sep|>')
+        # dataset = TextDataset(encodings)
+        dataset = TextDataset(encodings, sep_token_id)
         return dataset
 
     def preprocess_data(self, data):
@@ -59,37 +62,46 @@ class Model_GPT2:
         
         # Decode the generated output
         generated_text = self.tokenizer.decode(output[0], skip_special_tokens=True)
-        return generated_text #.replace("<|sep|>", "").strip()
+        return generated_text.replace("<|sep|>", "").strip()
 
-    def train(self, train_dataset, lr=5e-4, epochs=10):
+    def train(self, train_dataset, lr=5e-4, epochs=12):
         self.clear_cache()
 
-        time = datetime.now().strftime("%Y_%m_%d,%H_%M")
+        time = datetime.now().strftime("%Y_%m_%d_%H_%M")
         logger.add(f"./logs/gpt2_{time}.log")
 
-        custom_callback = CustomEarlyStoppingCallback(threshold=0.0001, logger=logger)
+        # custom_callback = CustomEarlyStoppingCallback(threshold=0.0000001, logger=logger)
+        custom_callback = CustomEarlyStoppingCallback(logger=logger)
+        save_model_callback = CustomSaveModelCallback(self.model, self.tokenizer, epoch_save=5)
+
+
         training_args = TrainingArguments(
-            output_dir='./results',          # output directory
-            report_to="wandb",            # directory for storing logs
-            run_name="wandb_chat_gpt2",  # name of the W&B run (optional)
-            logging_steps=1,  # how often to log to W&B
-            num_train_epochs=epochs,               # Total number of training epochs
+            output_dir='./results',           # output directory
+            logging_dir='./logs',             # directory for storing logs
+            report_to="wandb",                # directory for storing logs
+            run_name="wandb_chat_gpt2",       # name of the W&B run (optional)
+            logging_steps=1,                  # how often to log to W&B
+            num_train_epochs=epochs,          # Total number of training epochs
             per_device_train_batch_size=2,    # Batch size per device during training
-            save_steps=10_000,                 # After how many steps to save the model
-            save_total_limit=2,                # Limit the total amount of checkpoints
+            save_steps=10_000,                # After how many steps to save the model
+            save_total_limit=2,               # Limit the total amount of checkpoints
             prediction_loss_only=True,
             learning_rate=lr
         )
 
         trainer = Trainer(
-            model=self.model,                # the instantiated Transformers model to be trained
-            args=training_args,              # training arguments, defined above
+            model=self.model,                 # the instantiated Transformers model to be trained
+            args=training_args,               # training arguments, defined above
             train_dataset=train_dataset,      # training dataset
-            callbacks=[custom_callback]
+            callbacks=[custom_callback, save_model_callback]
         )
         trainer.train()
 
     def save(self, path='./models'):
+        directory = os.path.abspath(path)
+        if os.path.exists(directory):
+            shutil.rmtree(directory)
+
         self.model.save_pretrained(path)
         self.tokenizer.save_pretrained(path)
     
@@ -99,8 +111,6 @@ class Model_GPT2:
             path = os.path.abspath(directory)
             if os.path.exists(directory):
                 shutil.rmtree(path)
-        
-        
 
 def run_model(config_file):
     return load_config(config_file)
