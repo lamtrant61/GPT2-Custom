@@ -72,7 +72,7 @@ class Model_GPT2:
 
         # custom_callback = CustomEarlyStoppingCallback(threshold=0.0000001, logger=logger)
         custom_callback = CustomEarlyStoppingCallback(logger=logger)
-        save_model_callback = CustomSaveModelCallback(self.model, self.tokenizer, epoch_save=5)
+        save_model_callback = CustomSaveModelCallback(self.model, self.tokenizer, epoch_save=1)
 
 
         training_args = TrainingArguments(
