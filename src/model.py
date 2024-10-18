@@ -2,11 +2,11 @@ import os
 from dotenv import load_dotenv
 import torch
 from transformers import GPT2LMHeadModel, GPT2Tokenizer, Trainer, TrainingArguments
-from .utils.common import load_config, load_csv_data, get_device
+from .utils.common import load_config, load_csv_data
 from .utils.dataset import TextDataset
-from tqdm import tqdm
+# from tqdm import tqdm
 # from datasets import Dataset
-import pandas as pd
+# import pandas as pd
 
 os.environ["WANDB_LOG_MODEL"] = "checkpoint"  # log all model checkpoints
 os.environ["WANDB_MODE"] = "dryrun"  # offline mode
@@ -36,11 +36,21 @@ class Model_GPT2:
     def preprocess_data(self, data):
         return self.tokenizer(data, padding="max_length", truncation=True, max_length=512)
     
-    def generate(self, data):
+    def generate(self, data, config=None):
+        # Preprocess the input data
         input_ids = self.preprocess_data(data)
-        input_ids = tf.constant(input_ids["input_ids"])
-        output = self.model.generate(input_ids, max_length=100, num_return_sequences=1)
-        return self.tokenizer.decode(output[0], skip_special_tokens=True)
+        input_ids = torch.tensor(input_ids["input_ids"]).unsqueeze(0).to(self.device)  # Add batch dimension and move to device
+        
+        # Generate text using the model
+        output = self.model.generate(
+            input_ids,
+            pad_token_id = self.tokenizer.pad_token_id,  # Set pad token ID
+            **config
+        )
+        
+        # Decode the generated output
+        generated_text = self.tokenizer.decode(output[0], skip_special_tokens=True)
+        return generated_text
 
     def train(self, train_dataset, lr=5e-5, epochs=3):
         training_args = TrainingArguments(
@@ -48,7 +58,7 @@ class Model_GPT2:
             report_to="wandb",            # directory for storing logs
             run_name="wandb_chat_gpt2",  # name of the W&B run (optional)
             logging_steps=1,  # how often to log to W&B
-            num_train_epochs=20,               # Total number of training epochs
+            num_train_epochs=200,               # Total number of training epochs
             per_device_train_batch_size=4,    # Batch size per device during training
             save_steps=10_000,                 # After how many steps to save the model
             save_total_limit=2,                # Limit the total amount of checkpoints
