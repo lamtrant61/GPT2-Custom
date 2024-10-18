@@ -4,6 +4,8 @@ import torch
 from transformers import GPT2LMHeadModel, GPT2Tokenizer, Trainer, TrainingArguments
 from .utils.common import load_config, load_csv_data
 from .utils.dataset import TextDataset
+from .utils.callback import CustomEarlyStoppingCallback
+import shutil
 # from tqdm import tqdm
 # from datasets import Dataset
 # import pandas as pd
@@ -18,6 +20,7 @@ print(model_name)
 
 class Model_GPT2:
     def __init__(self, model_name=model_name):
+        print ("Model name: ", model_name)
         self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token  # Đặt pad token là eos token
         self.model = GPT2LMHeadModel.from_pretrained(model_name)
@@ -26,9 +29,11 @@ class Model_GPT2:
 
     def loading_dataset(self, filename):
         df = load_csv_data(filename)
-        df['text'] = df['Question'] + " " + df['Answer']
+        df['text'] = df['Question'] + " <|sep|> " + df['Answer']
 
-        texts = df['text'].tolist() 
+        texts_raw = df['text'].tolist()
+        texts = texts_raw * 5
+
         encodings = self.tokenizer(texts, truncation=True, padding=True, return_tensors='pt', max_length=512)
         dataset = TextDataset(encodings)
         return dataset
@@ -38,7 +43,8 @@ class Model_GPT2:
     
     def generate(self, data, config=None):
         # Preprocess the input data
-        input_ids = self.preprocess_data(data)
+        input_text = data + " <|sep|> "
+        input_ids = self.preprocess_data(input_text)
         input_ids = torch.tensor(input_ids["input_ids"]).unsqueeze(0).to(self.device)  # Add batch dimension and move to device
         
         # Generate text using the model
@@ -50,31 +56,42 @@ class Model_GPT2:
         
         # Decode the generated output
         generated_text = self.tokenizer.decode(output[0], skip_special_tokens=True)
-        return generated_text
+        return generated_text.replace("<|sep|>", "").strip()
 
-    def train(self, train_dataset, lr=5e-5, epochs=3):
+    def train(self, train_dataset, lr=5e-4, epochs=10):
+        self.clear_cache()
+        custom_callback = CustomEarlyStoppingCallback(threshold=0.0001)
         training_args = TrainingArguments(
             output_dir='./results',          # output directory
             report_to="wandb",            # directory for storing logs
             run_name="wandb_chat_gpt2",  # name of the W&B run (optional)
             logging_steps=1,  # how often to log to W&B
-            num_train_epochs=200,               # Total number of training epochs
-            per_device_train_batch_size=4,    # Batch size per device during training
+            num_train_epochs=epochs,               # Total number of training epochs
+            per_device_train_batch_size=2,    # Batch size per device during training
             save_steps=10_000,                 # After how many steps to save the model
             save_total_limit=2,                # Limit the total amount of checkpoints
             prediction_loss_only=True,
+            learning_rate=lr
         )
 
         trainer = Trainer(
             model=self.model,                # the instantiated Transformers model to be trained
             args=training_args,              # training arguments, defined above
-            train_dataset=train_dataset      # training dataset
+            train_dataset=train_dataset,      # training dataset
+            callbacks=[custom_callback]
         )
         trainer.train()
 
     def save(self, path='./models'):
         self.model.save_pretrained(path)
         self.tokenizer.save_pretrained(path)
+    
+    def clear_cache(self):
+        directories = ['./results', './models']
+        for directory in directories:
+            path = os.path.abspath(directory)
+            if os.path.exists(directory):
+                shutil.rmtree(path)
         
         
 
