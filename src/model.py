@@ -8,6 +8,7 @@ from .utils.callback import CustomEarlyStoppingCallback, CustomSaveModelCallback
 import shutil
 from loguru import logger
 from datetime import datetime
+import pandas as pd
 
 os.environ["WANDB_LOG_MODEL"] = "checkpoint"  # log all model checkpoints
 os.environ["WANDB_MODE"] = "dryrun"  # offline mode
@@ -33,9 +34,12 @@ class Model_GPT2:
     def loading_dataset(self, filename):
         df = load_csv_data(filename)
         # df['text'] = df['Question'] + " " + df['Answer']
+        df = self.various_dataset(df)
         df['text'] = df['Question'] + " <|sep|> " + df['Answer']
 
         texts_raw = df['text'].tolist()
+        self.clean_text(texts_raw)
+
         texts = texts_raw * 5
 
         encodings = self.tokenizer(texts, truncation=True, padding=True, return_tensors='pt', max_length=512)
@@ -43,6 +47,26 @@ class Model_GPT2:
         # dataset = TextDataset(encodings)
         dataset = TextDataset(encodings, sep_token_id)
         return dataset
+    
+    def clean_text(self, list_text):
+        for i in range(len(list_text)):
+            if (list_text[i][-1] != "."):
+                list_text[i] = list_text[i] + "."
+    
+    def various_dataset(self, pd_raw):
+        new_question = []
+        new_answer = []
+        for i in range(len(pd_raw)):
+            new_question.append(pd_raw.iloc[i]['Question'].lower())
+            new_answer.append(pd_raw.iloc[i]['Answer'])
+            new_question.append(pd_raw.iloc[i]['Question'].upper())
+            new_answer.append(pd_raw.iloc[i]['Answer'])
+        new_data = {
+            'Question': new_question,
+            'Answer': new_answer,
+        }
+        new_rows_df = pd.DataFrame(new_data)
+        return pd.concat([pd_raw, new_rows_df], ignore_index=True)
 
     def preprocess_data(self, data):
         return self.tokenizer(data, padding="max_length", truncation=True, max_length=512)
@@ -64,7 +88,7 @@ class Model_GPT2:
         generated_text = self.tokenizer.decode(output[0], skip_special_tokens=True)
         return generated_text.replace("<|sep|>", "").strip()
 
-    def train(self, train_dataset, lr=5e-4, epochs=12):
+    def train(self, train_dataset, lr=5e-4, epochs=4):
         self.clear_cache()
 
         time = datetime.now().strftime("%Y_%m_%d_%H_%M")
@@ -72,7 +96,7 @@ class Model_GPT2:
 
         # custom_callback = CustomEarlyStoppingCallback(threshold=0.0000001, logger=logger)
         custom_callback = CustomEarlyStoppingCallback(logger=logger)
-        save_model_callback = CustomSaveModelCallback(self.model, self.tokenizer, epoch_save=1)
+        save_model_callback = CustomSaveModelCallback(self.model, self.tokenizer, epoch_save=1, gpt_model=self)
 
 
         training_args = TrainingArguments(
