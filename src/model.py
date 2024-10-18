@@ -6,6 +6,8 @@ from .utils.common import load_config, load_csv_data
 from .utils.dataset import TextDataset
 from .utils.callback import CustomEarlyStoppingCallback
 import shutil
+from loguru import logger
+from datetime import datetime
 # from tqdm import tqdm
 # from datasets import Dataset
 # import pandas as pd
@@ -21,6 +23,7 @@ print(model_name)
 class Model_GPT2:
     def __init__(self, model_name=model_name):
         print ("Model name: ", model_name)
+        self.model_name = model_name
         self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
         self.tokenizer.pad_token = self.tokenizer.eos_token  # Đặt pad token là eos token
         self.model = GPT2LMHeadModel.from_pretrained(model_name)
@@ -56,11 +59,15 @@ class Model_GPT2:
         
         # Decode the generated output
         generated_text = self.tokenizer.decode(output[0], skip_special_tokens=True)
-        return generated_text.replace("<|sep|>", "").strip()
+        return generated_text #.replace("<|sep|>", "").strip()
 
     def train(self, train_dataset, lr=5e-4, epochs=10):
         self.clear_cache()
-        custom_callback = CustomEarlyStoppingCallback(threshold=0.0001)
+
+        time = datetime.now().strftime("%Y-%m-%d %H:%M")
+        logger.add(f"./logs/gpt2_{time}.log")
+
+        custom_callback = CustomEarlyStoppingCallback(threshold=0.0001, logger=logger)
         training_args = TrainingArguments(
             output_dir='./results',          # output directory
             report_to="wandb",            # directory for storing logs
@@ -87,7 +94,7 @@ class Model_GPT2:
         self.tokenizer.save_pretrained(path)
     
     def clear_cache(self):
-        directories = ['./results', './models']
+        directories = ['./results', './models', './wandb', './logs']
         for directory in directories:
             path = os.path.abspath(directory)
             if os.path.exists(directory):
