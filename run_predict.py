@@ -7,7 +7,8 @@ model_generate_config = config["model_generate_config"]
 
 Model = Model_GPT2(os.path.abspath("./models"))
 
-question = "giới thiệu wghn"
+question = "wghn"
 predict = Model.generate(question, model_generate_config)
-print ("\n\n\n", predict)
+print ("\n\n\nMe: ", question)
+print ("\n\n\nBot: ", predict)
 
