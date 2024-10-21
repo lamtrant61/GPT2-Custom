@@ -2,6 +2,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import SVC
 from sklearn.metrics import classification_report, accuracy_score
+from .utils.common import load_csv_data
 
 class Model_SVC:
     def __init__(self, is_init=True):
@@ -18,19 +19,17 @@ class Model_SVC:
 
     def load_data_train(self, filename):
         df = load_csv_data(filename)
-        X = df['text'].tolist()
-        y = df['label'].tolist()
-        X_train, X_test, y_train, y_test = train_test_split(texts, labels, test_size=0.2, random_state=42)
-        return X_train, X_test, y_train, y_test
+        X = df['texts'].tolist()
+        y = df['labels'].tolist()
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        self.preprocess_data()
 
-    def preprocess_data(self, train_data, test_data):
+    def preprocess_data(self):
         self.vectorizer = TfidfVectorizer()
-        X_train_tfidf = vectorizer.fit_transform(train_data)
-        X_test_tfidf = vectorizer.transform(test_data)
+        X_train_tfidf = vectorizer.fit_transform(self.X_train)
+        X_test_tfidf = vectorizer.transform(self.X_test)
         self.x_train = X_train_tfidf
-        self.y_train = y_train
         self.x_test = X_test_tfidf
-        self.y_test = y_test
     
     def train(self, X_train, y_train):
         self.model.summary()
