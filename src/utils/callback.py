@@ -4,9 +4,10 @@ from transformers import TrainerCallback
 from .common import load_config
 
 class CustomEarlyStoppingCallback(TrainerCallback):
-    def __init__(self, threshold=None, logger=None):
+    def __init__(self, threshold=None, logger=None, writer=None):
         self.threshold = threshold
         self.logger = logger
+        self.writer = writer
 
     def on_log(self, args, state, control, logs=None, **kwargs):
         # Ensure logs is not None
@@ -34,6 +35,7 @@ class CustomEarlyStoppingCallback(TrainerCallback):
 
         if 'loss' in logs:
             self.logger.info(f"Epoch {state.epoch}, Loss: {logs['loss']}")
+            self.writer.add_scalar("Loss/Train", logs['loss'], state.epoch)
 
 class CustomSaveModelCallback(TrainerCallback):
     def __init__(self, model, tokenizer, epoch_save=10, path='./models', gpt_model=None):
