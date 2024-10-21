@@ -5,6 +5,7 @@ from transformers import GPT2LMHeadModel, GPT2Tokenizer, Trainer, TrainingArgume
 from .utils.common import load_config, load_csv_data
 from .utils.dataset import TextDataset
 from .utils.callback import CustomEarlyStoppingCallback, CustomSaveModelCallback
+from torch.utils.tensorboard import SummaryWriter
 import shutil
 from loguru import logger
 from datetime import datetime
@@ -40,7 +41,7 @@ class Model_GPT2:
         texts_raw = df['text'].tolist()
         self.clean_text(texts_raw)
 
-        texts = texts_raw * 5
+        texts = texts_raw * 8
 
         encodings = self.tokenizer(texts, truncation=True, padding=True, return_tensors='pt', max_length=512)
         sep_token_id = self.tokenizer.convert_tokens_to_ids('<|sep|>')
@@ -94,14 +95,17 @@ class Model_GPT2:
         result = '. '.join(capitalized_sentences)
         return result
 
-    def train(self, train_dataset, lr=5e-4, epochs=4):
+    def train(self, train_dataset, lr=5e-5, epochs=10):
         self.clear_cache()
 
         time = datetime.now().strftime("%Y_%m_%d_%H_%M")
         logger.add(f"./logs/gpt2_{time}.log")
 
+        # writer = SummaryWriter(log_dir=f'./logs/tensorboard_{time}')
+        writer = SummaryWriter(log_dir=f'./logs')
+
         # custom_callback = CustomEarlyStoppingCallback(threshold=0.0000001, logger=logger)
-        custom_callback = CustomEarlyStoppingCallback(logger=logger)
+        custom_callback = CustomEarlyStoppingCallback(logger=logger, writer=writer)
         save_model_callback = CustomSaveModelCallback(self.model, self.tokenizer, epoch_save=1, gpt_model=self)
 
 
