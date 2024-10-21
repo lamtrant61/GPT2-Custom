@@ -21,6 +21,7 @@ class CustomEarlyStoppingCallback(TrainerCallback):
         if 'loss' in logs:
             current_loss = logs['loss']
 
+            self.writer.add_scalar("Loss function", logs['loss'], state.epoch)
             # Stop training if loss is below or equal to the threshold
             if current_loss <= self.threshold:
                 print(f"\nStopping training as loss has reached the threshold: {current_loss}")
@@ -35,7 +36,7 @@ class CustomEarlyStoppingCallback(TrainerCallback):
 
         if 'loss' in logs:
             self.logger.info(f"Epoch {state.epoch}, Loss: {logs['loss']}")
-            self.writer.add_scalar("Loss/Train", logs['loss'], state.epoch)
+            # self.writer.add_scalar("Loss/Train", logs['loss'], state.epoch)
 
 class CustomSaveModelCallback(TrainerCallback):
     def __init__(self, model, tokenizer, epoch_save=10, path='./models', gpt_model=None):
