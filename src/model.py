@@ -86,7 +86,13 @@ class Model_GPT2:
         
         # Decode the generated output
         generated_text = self.tokenizer.decode(output[0], skip_special_tokens=True)
-        return generated_text.replace("<|sep|>", "").strip()
+        get_answer = generated_text.replace("<|sep|>", "").strip()
+
+        sentences = get_answer.split(".")
+
+        capitalized_sentences = [s.strip().capitalize() for s in sentences]
+        result = '. '.join(capitalized_sentences)
+        return result
 
     def train(self, train_dataset, lr=5e-4, epochs=4):
         self.clear_cache()
