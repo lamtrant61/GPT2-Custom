@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 import torch
-from transformers import GPT2LMHeadModel, GPT2Tokenizer, Trainer, TrainingArguments
+from transformers import GPT2LMHeadModel, GPT2Tokenizer, Trainer, TrainingArguments, AutoModelForCausalLM, AutoTokenizer
 from .utils.common import load_config, load_csv_data
 from .utils.dataset import TextDataset
 from .utils.callback import CustomEarlyStoppingCallback, CustomSaveModelCallback
@@ -23,14 +23,31 @@ class Model_GPT2:
     def __init__(self, model_name=model_name):
         print ("Model name: ", model_name)
         self.model_name = model_name
-        self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
-        self.tokenizer.pad_token = self.tokenizer.eos_token  # Đặt pad token là eos token
-        self.model = GPT2LMHeadModel.from_pretrained(model_name)
+        if (model_name.find("llama") != -1):
+            from peft import get_peft_model, LoraConfig, TaskType
+            self.model = AutoModelForCausalLM.from_pretrained(model_name, device_map={"": "cpu"}, trust_remote_code=False, revision="main")
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
 
+            peft_config = LoraConfig(
+                task_type=TaskType.CAUSAL_LM,  # Loại tác vụ (ngôn ngữ tự sinh - Causal LM)
+                inference_mode=False,  # Đặt là False khi fine-tune
+                r=8,  # Rank của Lora
+                lora_alpha=32,  # Alpha của Lora
+                lora_dropout=0.1,  # Dropout trong Lora
+                target_modules=["q_proj", "v_proj"],  # Đặt target modules để fine-tune một phần nhỏ của mô hình
+                bias="none"
+            )
+            self.model = get_peft_model(self.model, peft_config)
+        elif (model_name.find("gpt2") != -1):
+            self.tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+            self.model = GPT2LMHeadModel.from_pretrained(model_name)
+
+        self.tokenizer.pad_token = self.tokenizer.eos_token  # Đặt pad token là eos token
         special_tokens_dict = {'sep_token': '<|sep|>'}
         self.tokenizer.add_special_tokens(special_tokens_dict)
         self.model.resize_token_embeddings(len(self.tokenizer))
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model.to(self.device)
 
     def loading_dataset(self, filename):
         df = load_csv_data(filename)
@@ -41,7 +58,7 @@ class Model_GPT2:
         texts_raw = df['text'].tolist()
         self.clean_text(texts_raw)
 
-        texts = texts_raw * 8
+        texts = texts_raw
 
         encodings = self.tokenizer(texts, truncation=True, padding=True, return_tensors='pt', max_length=512)
         sep_token_id = self.tokenizer.convert_tokens_to_ids('<|sep|>')
@@ -95,14 +112,14 @@ class Model_GPT2:
         result = '. '.join(capitalized_sentences)
         return result
 
-    def train(self, train_dataset, lr=5e-5, epochs=10):
+    def train(self, train_dataset, lr=3*5e-5, epochs=2):
         self.clear_cache()
 
         time = datetime.now().strftime("%Y_%m_%d_%H_%M")
         logger.add(f"./logs/gpt2_{time}.log")
 
         # writer = SummaryWriter(log_dir=f'./logs/tensorboard_{time}')
-        writer = SummaryWriter(log_dir=f'./logs')
+        writer = SummaryWriter(log_dir=f'./logs') # log này có biểu đồ # tensorboard --logdir=logs
 
         # custom_callback = CustomEarlyStoppingCallback(threshold=0.0000001, logger=logger)
         custom_callback = CustomEarlyStoppingCallback(logger=logger, writer=writer)
@@ -116,8 +133,8 @@ class Model_GPT2:
             run_name="wandb_chat_gpt2",       # name of the W&B run (optional)
             logging_steps=1,                  # how often to log to W&B
             num_train_epochs=epochs,          # Total number of training epochs
-            per_device_train_batch_size=2,    # Batch size per device during training
-            save_steps=10_000,                # After how many steps to save the model
+            per_device_train_batch_size=1,    # Batch size per device during training
+            save_steps=1_000,                 # After how many steps to save the model
             save_total_limit=2,               # Limit the total amount of checkpoints
             prediction_loss_only=True,
             learning_rate=lr
